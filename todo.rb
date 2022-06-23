@@ -9,6 +9,15 @@ configure do
   set :erb, :escape_html => true
 end
 
+def load_list(index)
+  begin
+    return session[:lists].fetch(index)
+  rescue IndexError, TypeError
+    session[:error] = "The specified list was not found."
+    redirect "/lists"
+  end 
+end
+
 helpers do
   def list_complete?(list)
     todos_count(list) > 0 && todos_remaining_count(list) == 0
@@ -63,7 +72,7 @@ end
 # show todo list
 get "/lists/:id" do
   @list_id = params[:id].to_i
-  @list = session[:lists][@list_id]
+  @list = load_list(@list_id)
   erb :list, layout: :layout
 end
 
@@ -101,7 +110,7 @@ end
 # edit an existing todo list
 get "/lists/:id/edit" do
   id = params[:id].to_i
-  @list = session[:lists][id]
+  @list = load_list(id)
   erb :edit_list, layout: :layout
 end
 
@@ -109,7 +118,7 @@ end
 post "/lists/:id" do
   list_name = params[:list_name].strip
   id = params[:id].to_i
-  @list = session[:lists][id]
+  @list = load_list(id)
 
   error = error_for_list_name(list_name)
   if error  
@@ -133,7 +142,7 @@ end
 # add a todo to a list
 post "/lists/:list_id/todos" do
   @list_id = params[:list_id].to_i
-  @list = session[:lists][@list_id]
+  @list = load_list(@list_id)
   text = params[:todo].strip
   error = error_for_todo(text)
   if error
@@ -150,7 +159,8 @@ end
 post "/lists/:list_id/todos/:todo_id/destroy" do
   @list_id = params[:list_id].to_i
   todo_id = params[:todo_id].to_i
-  session[:lists][@list_id][:todos].delete_at(todo_id)
+  list = load_list(@list_id)
+  list[:todos].delete_at(todo_id)
   session[:success] = "The todo was deleted."
   redirect "/lists/#{@list_id}"
 end
@@ -159,7 +169,8 @@ end
 post "/lists/:list_id/todos/:todo_id" do
   @list_id = params[:list_id].to_i
   todo_id = params[:todo_id].to_i
-  todo = session[:lists][@list_id][:todos][todo_id]
+  list = load_list(@list_id)
+  todo = list[:todos][todo_id]
 
   is_completed = params[:completed] == "true"
   todo[:completed] = is_completed
@@ -171,7 +182,8 @@ end
 # complete all todos on list
 post "/lists/:id/complete_all" do
   @list_id = params[:id].to_i
-  todos = session[:lists][@list_id][:todos]
+  list = load_list(@list_id)
+  todos = list[:todos]
   todos.each { |todo| todo[:completed] = true }
   session[:success] = "All todos have been completed."
   redirect "/lists/#{@list_id}"
